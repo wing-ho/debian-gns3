@@ -15,11 +15,12 @@
     "symbol": "linux_guest.svg",
     "port_name_format": "p{0}",
     "qemu": {
-        "adapter_type": "e1000",
+        "adapter_type": "virtio-net-pci",
         "adapters": 4,
+        "hda_disk_interface": "virtio",
         "ram": 256,
         "arch": "x86_64",
-        "console_type": "telnet",
+        "console_type": "spice",
         "kvm": "allow"
     },
     "images": [
