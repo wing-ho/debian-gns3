@@ -8,6 +8,11 @@ Run with: ETH_DEVICE=no ./qemu-debian-create-image stretch3.qcow2 debian9 stretc
  * Later modified to <https://gist.github.com/spectra/10301941>
  * And then <https://gist.github.com/jalsot/a24aa543021889ad0c70>
  * And then <https://gist.github.com/ldhieu/716db2f79ce49b95aa18e29885c16259>
+ * 添加对UEFI启动的支持
+
+支持GNS3的OVMF文件下载地址：<https://docs.gns3.com/appliances/cisco-nxosv9k.html>
+
+Advanced settings -> Bios -> Bios Image -> Browse上传Bios固件到appliance中。
 
 ## TODO
 

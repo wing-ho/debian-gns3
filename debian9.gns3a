@@ -24,19 +24,17 @@
     },
     "images": [
         {
-            "filename": "debian9-0.2.qcow2",
-            "version": "0.2",
-            "md5sum": "1989455b5e0329acd9af17532536dca8",
-            "filesize": 970981376,
-            "download_url": "https://people.debian.org/~lucas/gns3/",
-            "direct_download_url": "https://people.debian.org/~lucas/gns3/debian9-0.2.qcow2.zip"
+            "filename": "debian9-0.3.qcow2",
+            "version": "0.3",
+            "md5sum": "76bcc288bfd3bb1a4c751d85bfaa3ae6",
+            "filesize": 1026162688
         }
     ],
     "versions": [
         {
-            "name": "0.2",
+            "name": "0.3",
             "images": {
-                "hda_disk_image": "debian9-0.2.qcow2"
+                "hda_disk_image": "debian9-0.3.qcow2"
             }
         }
     ]

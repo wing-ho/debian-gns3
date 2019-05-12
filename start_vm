@@ -1,0 +1,67 @@
+#!/bin/bash
+BOOT_USB=(
+# 等同于-enable-kvm，macOS下accel=hvf
+-machine accel=kvm
+# 设置内存容量
+-m 1G
+# 设置cpu
+-cpu host
+# 打开启动菜单
+-boot menu=on
+# UEFI固件
+-drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/OVMF_CODE.fd
+-drive file=qemu.nvram,if=pflash,format=raw,unit=1
+# 硬件时间
+-rtc clock=host,base=utc
+# usb 2.0控制器
+#-device usb-ehci,id=ehci
+# windows系统启动用该选项
+#-device usb-tablet,bus=usb-bus.0
+# usb 3.0控制器
+#-device nec-usb-xhci,id=xhci
+# 可以将某个插口直通给虚拟机，在虚拟机控制台通过info usbhost命令查看
+#-device usb-host,bus=xhci.0,hostbus=3,hostport=1,id=usb-driver
+# 使用当前的标准输入和输出做为控制台
+-monitor stdio
+# 使用telnet Server作为控制台
+#-monitor telnet:127.0.0.1:1023,server,nowait
+# 直接使用内核启动
+#-kernel vmlinuz
+#-initrd initrd.img
+# 以下三个参数用于虚拟机接管当前console
+#-append "'root=/dev/sda3 ro single console=ttyS0'"
+#-nographic
+#-serial mon:stdio
+# ide控制器
+#-drive if=none,file=/home/wing/machines/win10.vhd,format=vpc,id=system
+#-device ide-hd,drive=system,bus=ide.1,unit=0
+# scsi热插拔
+#-device scsi-hd,drive=system,bus=scsi0.0,scsi-id=0
+#-device virtio-scsi-pci,id=scsi0,bus=pci.0,addr=0x8 
+#-drive if=none,file=debian.img,format=raw,id=system
+# virtio驱动
+-drive if=virtio,format=qcow2,file=debian.qcow2,id=system
+# 光驱
+#-drive file=$ISO_LTSB,media=cdrom,index=0
+#-drive file=$ISO_Debian,media=cdrom,index=0
+# 9p文件系统，把当前目录直通到虚拟机中
+#-fsdev local,id=home_dev,path=/home/wing,security_model=passthrough
+#-device virtio-9p-pci,fsdev=home_dev,mount_tag=home_mount
+# 网卡使用virtio驱动
+-net nic,model=virtio
+# 网络使用qemu内置模式，hostfwd设置端口映射
+-net user,hostfwd=tcp::2222-:22
+# smb共享目录
+#-netdev type=user,id=net0,smb=/home/wing
+# 用于更改网卡型号
+#-device e1000,netdev=net0
+# UEFI启动需要使用qxl驱动，否则会花屏
+-vga qxl
+# 使用vnc协议连接虚拟机
+#-vnc :3
+# 使用spice协议链接虚拟机
+#-spice port=5900,addr=127.0.0.1,disable-ticketing
+# 设置共享粘贴板
+#-device virtio-serial-pci -device virtserialport,chardev=spicechannel0,name=com.redhat.spice.0 -chardev spicevmc,id=spicechannel0,name=vdagent
+)
+sudo qemu-system-x86_64 "${BOOT_USB[@]}"

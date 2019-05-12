@@ -14,20 +14,20 @@ set -e
 VSYSTEM=${VSYSTEM:=qemu}						# Either 'qemu' or 'kvm'
 FLAVOUR=${FLAVOUR:=debian}					# Either 'debian' or 'ubuntu'
 INCLUDES=${INCLUDES:="less,vim,sudo,openssh-server,dbus,net-tools,traceroute,mtr-tiny,telnet,wget,curl,ethtool"}
-MIRROR=${MIRROR:="http://deb.debian.org/debian"}
+MIRROR=${MIRROR:="https://mirrors.tuna.tsinghua.edu.cn/debian"}
 #MIRROR=${MIRROR:="http://localhost:3142/debian"}
 #MIRROR=${MIRROR:="http://archive.ubuntu.com/ubuntu/"}
 #MIRROR=${MIRROR:="http://localhost:3142/ubuntu"}
 ARCH=${ARCH:=amd64}
 APT_CACHER=${APT_CACHER:=no}
-IMGSIZE=${IMGSIZE:=8G}
+IMGSIZE=${IMGSIZE:=30G}
 ROOTPASSWD=${ROOTPASSWD:=root}
 DISKNAME=${DISKNAME:=sda}
 GRUB_CMDLINE=${GRUB_CMDLINE:=console=ttyS0}
 ETH_DEVICE=${ETH_DEVICE:=ens3}
 
 clean_debian() {
-	[ "$MNT_DIR" != "" ] && chroot $MNT_DIR umount /proc/ /sys/ /dev/ /boot/
+	[ "$MNT_DIR" != "" ] && chroot $MNT_DIR umount /proc/ /sys/ /dev/ /boot/EFI
 	sleep 1s
 	[ "$MNT_DIR" != "" ] && umount $MNT_DIR
 	sleep 1s
@@ -67,6 +67,7 @@ echo "Installing $RELEASE into $FILE..."
 MNT_DIR=`tempfile`
 rm $MNT_DIR
 mkdir $MNT_DIR
+#MNT_DIR="/mnt"
 DISK=
 
 # add apt cacher for faster rebuilds, runs on 3142
@@ -98,6 +99,7 @@ do
 		break
 	fi
 done
+#DISK=/dev/nbd0
 
 [ "$DISK" == "" ] && fail "no nbd device available"
 
@@ -105,28 +107,33 @@ echo "Connected $FILE to $DISK"
 
 # New sfdisk on stretch doesn't do -D and -uM anymore
 echo "Partitioning $DISK..."
-sfdisk $DISK -q << EOF || fail "cannot partition $FILE"
-label: dos
-,200M,83,*
-;
-EOF
+sgdisk --clear -n 0::+1m -t 1:EF02 -n 0::+100m -t 2:EF00 -n 0::+1024m -t 3:8200 -n 0:: -t 4:8300 -h 2:4 -p $DISK
 
 echo "Creating boot partition..."
-mkfs.ext4 -q ${DISK}p1 || fail "cannot create /boot ext4"
+mkfs.vfat -F32 ${DISK}p2 || fail "cannot create /boot/EFI fat32"
+
+echo "Creating swap partition..."
+mkswap  ${DISK}p3 || fail "cannot create swap partition"
 
 echo "Creating root partition..."
-mkfs.ext4 -q ${DISK}p2 || fail "cannot create / ext4"
+mkfs.ext4 -q ${DISK}p4 || fail "cannot create / ext4"
 
 echo "Mounting root partition..."
-mount ${DISK}p2 $MNT_DIR || fail "cannot mount /"
+mount ${DISK}p4 $MNT_DIR || fail "cannot mount /"
+mkdir -p $MNT_DIR/boot/EFI
+mount ${DISK}p2 $MNT_DIR/boot/EFI || fail "cannot mount /"
 
 echo "Installing Debian $RELEASE..."
 debootstrap --include=$INCLUDES $* $RELEASE $MNT_DIR $MIRROR || fail "cannot install $RELEASE into $DISK"
 
+SWAP=`blkid | grep ${DISK}p3 | cut -d ' ' -f2`
+EFI=`blkid | grep ${DISK}p2 | cut -d ' ' -f2`
+ROOT=`blkid | grep ${DISK}p4 | cut -d ' ' -f2`
 echo "Configuring system..."
 cat <<EOF > $MNT_DIR/etc/fstab
-/dev/${DISKNAME}1 /boot               ext4    sync 0       2
-/dev/${DISKNAME}2 /                   ext4    errors=remount-ro 0       1
+$EFI  /boot/EFI  vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,utf8,errors=remount-ro   0 2
+$ROOT /                   ext4    errors=remount-ro 0       1
+$SWAP none            swap            defaults        0 0
 EOF
 
 echo $HOSTNAME > $MNT_DIR/etc/hostname
@@ -152,7 +159,6 @@ EOF
 fi
 
 mount --bind /dev/ $MNT_DIR/dev || fail "cannot bind /dev"
-chroot $MNT_DIR mount -t ext4 ${DISK}p1 /boot || fail "cannot mount /boot"
 chroot $MNT_DIR mount -t proc none /proc || fail "cannot mount /proc"
 chroot $MNT_DIR mount -t sysfs none /sys || fail "cannot mount /sys"
 LANG=C DEBIAN_FRONTEND=noninteractive chroot $MNT_DIR apt-get install -y --force-yes -q $BOOT_PKG || fail "cannot install $BOOT_PKG"
@@ -165,14 +171,13 @@ chroot $MNT_DIR update-grub || fail "cannot update grub"
 chroot $MNT_DIR apt-get clean || fail "unable to clean apt cache"
 chroot $MNT_DIR rm -rf /var/lib/apt/lists/*
 
-sed -i "s|${DISK}p1|/dev/${DISKNAME}1|g" $MNT_DIR/boot/grub/grub.cfg
-sed -i "s|${DISK}p2|/dev/${DISKNAME}2|g" $MNT_DIR/boot/grub/grub.cfg
+sed -i "s/root=[^ \t]*/root=$ROOT/g" $MNT_DIR/boot/grub/grub.cfg
 
 # Set root password
 echo "root:${ROOTPASSWD}" | chroot $MNT_DIR chpasswd
 
 echo "Finishing grub installation..."
-grub-install $DISK --root-directory=$MNT_DIR --modules="biosdisk part_msdos" --skip-fs-probe || fail "cannot reinstall grub"
+grub-install $DISk --target=x86_64-efi --efi-directory=$MNT_DIR/boot/EFI --boot-directory=$MNT_DIR/boot  || fail "cannot install grub-efi"
 
 echo "SUCCESS!"
 clean_debian
